@@ -8,26 +8,21 @@ import json
 from datetime import datetime
 
 # ─────────────────────────────────────────────
-
 # PAGE CONFIG
-
 # ─────────────────────────────────────────────
 
 st.set_page_config(
-page_title="GMB Dominator",
-page_icon=“🗺️”,
-layout=“wide”,
-initial_sidebar_state=“expanded”,
+    page_title="GMB Dominator",
+    page_icon="🗺️",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 # ─────────────────────────────────────────────
-
 # CUSTOM CSS
-
 # ─────────────────────────────────────────────
 
-st.markdown(”””
-
+st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400;500&display=swap');
 
@@ -247,141 +242,129 @@ h1, h2, h3, h4 {
     margin-top: 1.5rem;
 }
 </style>
-
-“””, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-
 # HELPERS
-
 # ─────────────────────────────────────────────
 
-ACCESS_CODE = “GROW2026”
+ACCESS_CODE = "GROW2026"
 
 def extract_exif(image_bytes):
-“”“Extract GPS and timestamp from JPEG EXIF data.”””
-try:
-img = Image.open(io.BytesIO(image_bytes))
-exif_data = img._getexif()
-if not exif_data:
-return None, None, None
+    """Extract GPS and timestamp from JPEG EXIF data."""
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        exif_data = img._getexif()
+        if not exif_data:
+            return None, None, None
 
-```
-    gps_info = {}
-    timestamp = None
+        gps_info = {}
+        timestamp = None
 
-    for tag_id, value in exif_data.items():
-        tag = TAGS.get(tag_id, tag_id)
-        if tag == "GPSInfo":
-            for gps_tag_id, gps_value in value.items():
-                gps_tag = GPSTAGS.get(gps_tag_id, gps_tag_id)
-                gps_info[gps_tag] = gps_value
-        elif tag in ("DateTime", "DateTimeOriginal"):
-            timestamp = value
+        for tag_id, value in exif_data.items():
+            tag = TAGS.get(tag_id, tag_id)
+            if tag == "GPSInfo":
+                for gps_tag_id, gps_value in value.items():
+                    gps_tag = GPSTAGS.get(gps_tag_id, gps_tag_id)
+                    gps_info[gps_tag] = gps_value
+            elif tag in ("DateTime", "DateTimeOriginal"):
+                timestamp = value
 
-    lat = lon = None
-    if "GPSLatitude" in gps_info and "GPSLongitude" in gps_info:
-        def dms_to_dd(dms, ref):
-            d, m, s = [float(x) for x in dms]
-            dd = d + m / 60 + s / 3600
-            if ref in ("S", "W"):
-                dd = -dd
-            return round(dd, 6)
-        lat = dms_to_dd(gps_info["GPSLatitude"], gps_info.get("GPSLatitudeRef", "N"))
-        lon = dms_to_dd(gps_info["GPSLongitude"], gps_info.get("GPSLongitudeRef", "E"))
+        lat = lon = None
+        if "GPSLatitude" in gps_info and "GPSLongitude" in gps_info:
+            def dms_to_dd(dms, ref):
+                d, m, s = [float(x) for x in dms]
+                dd = d + m / 60 + s / 3600
+                if ref in ("S", "W"):
+                    dd = -dd
+                return round(dd, 6)
+            lat = dms_to_dd(gps_info["GPSLatitude"], gps_info.get("GPSLatitudeRef", "N"))
+            lon = dms_to_dd(gps_info["GPSLongitude"], gps_info.get("GPSLongitudeRef", "E"))
 
-    return lat, lon, timestamp
-except Exception:
-    return None, None, None
-```
+        return lat, lon, timestamp
+    except Exception:
+        return None, None, None
 
 def call_claude(prompt: str, tone: str) -> str:
-“”“Call Claude claude-sonnet-4-20250514 with the given prompt.”””
-tone_instructions = {
-“Professional”: “Use formal, authoritative language. Be concise, data-driven, and business-focused.”,
-“Hype”: “Use bold, energetic language with power words. Be exciting and motivating. Use emphasis strategically.”,
-“Friendly”: “Use warm, conversational language. Be encouraging, use simple words, and feel like a helpful friend.”,
-}
-system = f””“You are GMB Dominator, a Google Business Profile SEO expert helping small business owners rank higher on Google Maps.
-Tone: {tone_instructions.get(tone, tone_instructions[‘Professional’])}
+    """Call Claude with the given prompt."""
+    tone_instructions = {
+        "Professional": "Use formal, authoritative language. Be concise, data-driven, and business-focused.",
+        "Hype": "Use bold, energetic language with power words. Be exciting and motivating. Use emphasis strategically.",
+        "Friendly": "Use warm, conversational language. Be encouraging, use simple words, and feel like a helpful friend.",
+    }
+    system = f"""You are GMB Dominator, a Google Business Profile SEO expert helping small business owners rank higher on Google Maps.
+Tone: {tone_instructions.get(tone, tone_instructions['Professional'])}
 Format your response in clear sections using markdown. Be specific, actionable, and practical.
-Always return structured advice with clear headings.”””
+Always return structured advice with clear headings."""
 
-```
-client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-msg = client.messages.create(
-    model="claude-sonnet-4-20250514",
-    max_tokens=1800,
-    system=system,
-    messages=[{"role": "user", "content": prompt}],
-)
-return msg.content[0].text
-```
+    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    msg = client.messages.create(
+        model="claude-3-5-sonnet-20240620",
+        max_tokens=1800,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return msg.content[0].text
 
 def send_webhook(email, phone, business_name, report_text):
-“”“Send lead data to Make.com webhook.”””
-webhook_url = st.secrets.get(“MAKE_WEBHOOK_URL”, “”)
-if not webhook_url:
-return False
-payload = {
-“email”: email,
-“phone”: phone,
-“business_name”: business_name,
-“report_preview”: report_text[:500],
-“timestamp”: datetime.now().isoformat(),
-}
-try:
-r = requests.post(webhook_url, json=payload, timeout=5)
-return r.status_code == 200
-except Exception:
-return False
+    """Send lead data to Make.com webhook."""
+    webhook_url = st.secrets.get("MAKE_WEBHOOK_URL", "")
+    if not webhook_url:
+        return False
+    payload = {
+        "email": email,
+        "phone": phone,
+        "business_name": business_name,
+        "report_preview": report_text[:500],
+        "timestamp": datetime.now().isoformat(),
+    }
+    try:
+        r = requests.post(webhook_url, json=payload, timeout=5)
+        return r.status_code == 200
+    except Exception:
+        return False
 
 def sidebar_roadmap(steps_done):
-“”“Render the progress roadmap in the sidebar.”””
-steps = [
-(“Access Unlocked”, True),
-(“Business Info Entered”, steps_done >= 1),
-(“Photo Scanned”, steps_done >= 2),
-(“Strategy Generated”, steps_done >= 3),
-(“Report Delivered”, steps_done >= 4),
-]
-st.sidebar.markdown(”### 🗺️ Your SEO Roadmap”)
-for label, done in steps:
-icon = “✅” if done else “⬜”
-color = “#00c864” if done else “#444458”
-st.sidebar.markdown(
-f’<div class="checklist-item"><span style="color:{color}">{icon}</span> <span style="color:{color}">{label}</span></div>’,
-unsafe_allow_html=True,
-)
-st.sidebar.markdown(”—”)
-st.sidebar.markdown(
-‘<div style="font-size:0.75rem;color:#555568;margin-top:0.5rem;">Complete each step to maximize your GMB ranking.</div>’,
-unsafe_allow_html=True,
-)
+    """Render the progress roadmap in the sidebar."""
+    steps = [
+        ("Access Unlocked", True),
+        ("Business Info Entered", steps_done >= 1),
+        ("Photo Scanned", steps_done >= 2),
+        ("Strategy Generated", steps_done >= 3),
+        ("Report Delivered", steps_done >= 4),
+    ]
+    st.sidebar.markdown("### 🗺️ Your SEO Roadmap")
+    for label, done in steps:
+        icon = "✅" if done else "⬜"
+        color = "#00c864" if done else "#444458"
+        st.sidebar.markdown(
+            f'<div class="checklist-item"><span style="color:{color}">{icon}</span> <span style="color:{color}">{label}</span></div>',
+            unsafe_allow_html=True,
+        )
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        '<div style="font-size:0.75rem;color:#555568;margin-top:0.5rem;">Complete each step to maximize your GMB ranking.</div>',
+        unsafe_allow_html=True,
+    )
 
 # ─────────────────────────────────────────────
-
 # SESSION STATE
-
 # ─────────────────────────────────────────────
 
-if “authenticated” not in st.session_state:
-st.session_state.authenticated = False
-if “steps_done” not in st.session_state:
-st.session_state.steps_done = 0
-if “report” not in st.session_state:
-st.session_state.report = {}
-if “scan_result” not in st.session_state:
-st.session_state.scan_result = None
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+if "steps_done" not in st.session_state:
+    st.session_state.steps_done = 0
+if "report" not in st.session_state:
+    st.session_state.report = {}
+if "scan_result" not in st.session_state:
+    st.session_state.scan_result = None
 
 # ─────────────────────────────────────────────
-
 # HERO
-
 # ─────────────────────────────────────────────
 
-st.markdown(”””
-
+st.markdown("""
 <div class="gmb-hero">
     <h1>GMB DOMINATOR</h1>
     <div class="tagline">Rank #1 on Google Maps — No Agency Required</div>
@@ -389,260 +372,90 @@ st.markdown(”””
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-
 # GATE: PASSWORD SCREEN
-
 # ─────────────────────────────────────────────
 
 if not st.session_state.authenticated:
-sidebar_roadmap(0)
-col1, col2, col3 = st.columns([1, 2, 1])
-with col2:
-st.markdown(’<div class="gate-card">’, unsafe_allow_html=True)
-st.markdown(”### 🔐 Enter Your Access Code”)
-st.markdown(’<div style="color:#6a6a7a;font-size:0.9rem;margin-bottom:1rem;">Purchased your access? Enter the code from your receipt below.</div>’, unsafe_allow_html=True)
-code_input = st.text_input(“Access Code”, type=“password”, placeholder=“e.g. GROW2026”)
-if st.button(“Unlock GMB Dominator →”):
-if code_input.strip().upper() == ACCESS_CODE:
-st.session_state.authenticated = True
-st.session_state.steps_done = 1
-st.rerun()
-else:
-st.error(“❌ Invalid code. Purchase access to get your code.”)
-st.markdown(”—”)
-st.markdown(’<div style="font-size:0.8rem;color:#4a4a5a;">Don't have a code? <a href="#" style="color:#ff6b00;">Purchase Access →</a></div>’, unsafe_allow_html=True)
-st.markdown(’</div>’, unsafe_allow_html=True)
-st.stop()
+    sidebar_roadmap(0)
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown('<div class="gate-card">', unsafe_allow_html=True)
+        st.markdown("### 🔐 Enter Your Access Code")
+        st.markdown('<div style="color:#6a6a7a;font-size:0.9rem;margin-bottom:1rem;">Purchased your access? Enter the code from your receipt below.</div>', unsafe_allow_html=True)
+        code_input = st.text_input("Access Code", type="password", placeholder="e.g. GROW2026")
+        if st.button("Unlock GMB Dominator →"):
+            if code_input.strip().upper() == ACCESS_CODE:
+                st.session_state.authenticated = True
+                st.session_state.steps_done = 1
+                st.rerun()
+            else:
+                st.error("❌ Invalid code. Purchase access to get your code.")
+        st.markdown("---")
+        st.markdown('<div style="font-size:0.8rem;color:#4a4a5a;">Don\'t have a code? <a href="#" style="color:#ff6b00;">Purchase Access →</a></div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.stop()
 
 # ─────────────────────────────────────────────
-
 # MAIN APP (Authenticated)
-
 # ─────────────────────────────────────────────
 
 sidebar_roadmap(st.session_state.steps_done)
 
-st.sidebar.markdown(”—”)
-st.sidebar.markdown(”### ❓ FAQ”)
-with st.sidebar.expander(“Why do I need GPS in photos?”):
-st.write(“Google uses photo metadata to verify your location. Photos taken with Location Services ON signal authenticity and boost your local ranking.”)
-with st.sidebar.expander(“How do I turn on Location Services?”):
-st.write(”**iPhone:** Settings → Privacy → Location Services → Camera → ‘While Using’\n\n**Android:** Camera app → Settings → Location tags → ON”)
-with st.sidebar.expander(“Is this a monthly subscription?”):
-st.write(“No! You paid for lifetime access to this self-serve tool. No retainers, no ongoing fees.”)
-with st.sidebar.expander(“Do you manage my GMB profile?”):
-st.write(“No. This is a self-serve advisory tool. You implement the recommendations yourself.”)
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ❓ FAQ")
+with st.sidebar.expander("Why do I need GPS in photos?"):
+    st.write("Google uses photo metadata to verify your location. Photos taken with Location Services ON signal authenticity and boost your local ranking.")
+with st.sidebar.expander("How do I turn on Location Services?"):
+    st.write("**iPhone:** Settings → Privacy → Location Services → Camera → 'While Using'\n\n**Android:** Camera app → Settings → Location tags → ON")
 
 # ── COLUMNS LAYOUT ──
-
-left, right = st.columns([3, 2], gap=“large”)
-
-# ─────────────────────────────────────────────
-
-# LEFT COLUMN: INPUTS
-
-# ─────────────────────────────────────────────
+left, right = st.columns([3, 2], gap="large")
 
 with left:
-# ── Section 1: Business Info ──
-st.markdown(’<div class="section-badge">Step 1</div>’, unsafe_allow_html=True)
-st.markdown(’<div class="section-title">Your Business Info</div>’, unsafe_allow_html=True)
+    st.markdown('<div class="section-badge">Step 1</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Your Business Info</div>', unsafe_allow_html=True)
+    
+    biz_name = st.text_input("Business Name", placeholder="e.g. Mike's Auto Repair")
+    biz_category = st.text_input("Primary Category", placeholder="e.g. Auto Repair Shop")
+    biz_city = st.text_input("City / Service Area", placeholder="e.g. Austin, TX")
+    competitor = st.text_input("Top Competitor Name", placeholder="e.g. Joe's Garage")
+    tone = st.selectbox("Brand Vibe 🎭", ["Professional", "Hype", "Friendly"])
 
-```
-biz_name = st.text_input("Business Name", placeholder="e.g. Mike's Auto Repair")
-biz_category = st.text_input("Primary Category", placeholder="e.g. Auto Repair Shop")
-biz_city = st.text_input("City / Service Area", placeholder="e.g. Austin, TX")
-competitor = st.text_input("Top Competitor Name (for Gap Analysis)", placeholder="e.g. Joe's Garage")
-
-tone = st.selectbox(
-    "Brand Vibe 🎭",
-    ["Professional", "Hype", "Friendly"],
-    help="Choose how you want the advice to sound."
-)
-
-st.markdown("---")
-# ── Section 2: Photo Scanner ──
-st.markdown('<div class="section-badge">Step 2</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-title">📸 EXIF Metadata Scanner</div>', unsafe_allow_html=True)
-st.markdown('<div style="color:#7a7a8a;font-size:0.88rem;margin-bottom:1rem;">Upload a JPEG photo you plan to post on your Google Business Profile.</div>', unsafe_allow_html=True)
-
-uploaded = st.file_uploader("Upload JPEG Photo", type=["jpg", "jpeg"])
-
-if uploaded:
-    img_bytes = uploaded.read()
-    lat, lon, timestamp = extract_exif(img_bytes)
-
-    if lat and lon:
-        st.markdown(f'<div class="scan-ready">✅ <strong>SEO-Ready!</strong> GPS coordinates detected: {lat}, {lon}<br><small style="opacity:0.7;">Timestamp: {timestamp or "Not found"}</small></div>', unsafe_allow_html=True)
-        st.session_state.scan_result = {"status": "ready", "lat": lat, "lon": lon, "ts": timestamp}
-    elif timestamp:
-        st.markdown(f'<div class="scan-neutral">⚠️ <strong>Partial Data.</strong> Timestamp found ({timestamp}) but GPS is missing.<br><small>Take a new photo with Location Services ON for full SEO credit.</small></div>', unsafe_allow_html=True)
-        st.session_state.scan_result = {"status": "partial", "ts": timestamp}
-    else:
-        st.markdown('<div class="scan-missing">❌ <strong>Missing Tags.</strong> No GPS or timestamp detected.<br><small>Take a new photo with Location Services ON on your smartphone.</small></div>', unsafe_allow_html=True)
-        st.session_state.scan_result = {"status": "missing"}
-
-    st.session_state.steps_done = max(st.session_state.steps_done, 2)
-
-st.markdown("---")
-# ── Section 3: Generate ──
-st.markdown('<div class="section-badge">Step 3</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-title">🚀 Generate Your Strategy</div>', unsafe_allow_html=True)
-
-if st.button("⚡ Generate 3-Tier GMB Strategy"):
-    if not biz_name or not biz_category:
-        st.warning("Please fill in your Business Name and Category first.")
-    else:
-        scan = st.session_state.scan_result
-        photo_context = "No photo was uploaded."
-        if scan:
-            if scan["status"] == "ready":
-                photo_context = f"Photo scan: ✅ GPS found at {scan.get('lat')}, {scan.get('lon')}. Timestamp: {scan.get('ts')}. Photo is SEO-ready."
-            elif scan["status"] == "partial":
-                photo_context = f"Photo scan: ⚠️ Timestamp found ({scan.get('ts')}) but GPS is missing. User needs to retake with Location Services ON."
-            else:
-                photo_context = "Photo scan: ❌ No GPS or timestamp. User needs to retake photos with Location Services ON."
-
-        prompt = f"""
-```
-
-Business: {biz_name}
-Category: {biz_category}
-Location: {biz_city or ‘Not specified’}
-Competitor to beat: {competitor or ‘None specified’}
-Photo scan result: {photo_context}
-
-Generate a 3-Tier GMB Dominator Strategy Report:
-
-## TIER 1 — FOUNDATION
-
-- Recommend 1 primary + 3 secondary Google Business Profile categories
-- Write a 750-character keyword-rich business description/bio
-- List 5 must-have attributes to enable on their profile
-
-## TIER 2 — VISUAL STRATEGY
-
-- Based on the photo scan result above, give specific advice on photo optimization
-- Recommend photo types (interior, exterior, team, product) with posting cadence
-- Tips for geotagging and naming convention for image files
-
-## TIER 3 — COMPETITIVE GAP ANALYSIS
-
-- {“Compare against competitor: “ + competitor if competitor else “Provide general competitive positioning advice since no competitor was named”}
-- Identify 3 specific gaps to exploit
-- Give 3 quick wins the user can implement this week to outrank the competition
-
-End with a “Priority Action List” — the top 5 tasks to complete in the next 7 days.
-“””
-with st.spinner(“Analyzing your profile and building your strategy…”):
-try:
-report = call_claude(prompt, tone)
-st.session_state.report[“strategy”] = report
-st.session_state.steps_done = max(st.session_state.steps_done, 3)
-st.success(“✅ Strategy generated! See results on the right →”)
-except Exception as e:
-st.error(f”API error: {e}”)
-
-```
-# ── Lead Magnet ──
-st.markdown('<div class="lead-card">', unsafe_allow_html=True)
-st.markdown("### 📬 Get Your Report via Email & SMS")
-st.markdown('<div style="color:#7a7a8a;font-size:0.88rem;margin-bottom:1rem;">Enter your details to receive a link to your personalized report.</div>', unsafe_allow_html=True)
-lead_email = st.text_input("Email Address", placeholder="you@yourbusiness.com")
-lead_phone = st.text_input("Mobile Number (for SMS)", placeholder="+1 555-000-0000")
-if st.button("📨 Send Report to My Inbox"):
-    if not lead_email:
-        st.warning("Please enter your email address.")
-    elif not st.session_state.report.get("strategy"):
-        st.warning("Generate your strategy first (Step 3)!")
-    else:
-        success = send_webhook(lead_email, lead_phone, biz_name, st.session_state.report.get("strategy", ""))
-        if success:
-            st.success("✅ Sent! Check your email shortly.")
-            st.session_state.steps_done = max(st.session_state.steps_done, 4)
+    st.markdown("---")
+    st.markdown('<div class="section-badge">Step 2</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📸 EXIF Metadata Scanner</div>', unsafe_allow_html=True)
+    
+    uploaded = st.file_uploader("Upload JPEG Photo", type=["jpg", "jpeg"])
+    if uploaded:
+        img_bytes = uploaded.read()
+        lat, lon, ts = extract_exif(img_bytes)
+        if lat and lon:
+            st.markdown(f'<div class="scan-ready">✅ SEO-Ready! GPS: {lat}, {lon}</div>', unsafe_allow_html=True)
+            st.session_state.scan_result = {"status": "ready", "lat": lat, "lon": lon}
         else:
-            st.info("Webhook not configured. Copy your report from the right panel.")
-st.markdown('</div>', unsafe_allow_html=True)
-```
+            st.markdown('<div class="scan-missing">❌ Missing GPS Tags</div>', unsafe_allow_html=True)
+        st.session_state.steps_done = max(st.session_state.steps_done, 2)
 
-# ─────────────────────────────────────────────
-
-# RIGHT COLUMN: RESULTS
-
-# ─────────────────────────────────────────────
+    st.markdown("---")
+    if st.button("⚡ Generate 3-Tier GMB Strategy"):
+        if biz_name and biz_category:
+            prompt = f"Generate GMB strategy for {biz_name} in {biz_category} located in {biz_city}. Competitor: {competitor}."
+            with st.spinner("Analyzing..."):
+                report = call_claude(prompt, tone)
+                st.session_state.report["strategy"] = report
+                st.session_state.steps_done = 3
+                st.rerun()
 
 with right:
-st.markdown(’<div class="section-badge">Your Report</div>’, unsafe_allow_html=True)
-st.markdown(’<div class="section-title">3-Tier Strategy Engine</div>’, unsafe_allow_html=True)
+    st.markdown('<div class="section-badge">Your Report</div>', unsafe_allow_html=True)
+    if st.session_state.report.get("strategy"):
+        st.markdown(st.session_state.report["strategy"])
+    else:
+        st.info("Your strategy will appear here.")
 
-```
-if st.session_state.report.get("strategy"):
-    report_text = st.session_state.report["strategy"]
-
-    # Split into tiers for styled display
-    tier_configs = [
-        ("tier-1", "TIER 1", "🏗️ Foundation", "#ff6b00"),
-        ("tier-2", "TIER 2", "📸 Visual Strategy", "#00b4d8"),
-        ("tier-3", "TIER 3", "⚔️ Competitive Gap Analysis", "#7b2fff"),
-    ]
-
-    # Display raw report in an expander, styled tiers as summary
-    with st.expander("📋 Full Strategy Report (Copy & Save)", expanded=True):
-        st.markdown(report_text)
-
-    st.download_button(
-        label="⬇️ Download Report as .txt",
-        data=report_text,
-        file_name=f"GMB_Strategy_{biz_name.replace(' ','_')}.txt",
-        mime="text/plain",
-    )
-else:
-    # Empty state
-    st.markdown("""
-```
-
-<div style="
-    background:#13131a;
-    border:1px dashed #2a2a3a;
-    border-radius:14px;
-    padding:3rem 2rem;
-    text-align:center;
-    color:#3a3a4a;
-">
-    <div style="font-size:3rem;margin-bottom:1rem;">🗺️</div>
-    <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;color:#4a4a5a;">Your strategy will appear here</div>
-    <div style="font-size:0.85rem;margin-top:0.5rem;">Fill in your business info and click Generate →</div>
-</div>
-""", unsafe_allow_html=True)
-
-```
-# ── Tier Preview Cards (always visible as template) ──
-st.markdown("<br>", unsafe_allow_html=True)
-for cls, tier_label, tier_title, color in [
-    ("tier-1", "TIER 1", "🏗️ Foundation: Categories & Bio", "#ff6b00"),
-    ("tier-2", "TIER 2", "📸 Visual: Photo Strategy", "#00b4d8"),
-    ("tier-3", "TIER 3", "⚔️ Competitive: Gap Analysis", "#7b2fff"),
-]:
-    st.markdown(f"""
-```
-
-<div class="tier-card {cls}">
-    <div class="tier-label" style="color:{color}">{tier_label}</div>
-    <div class="tier-title">{tier_title}</div>
-    <div style="color:#5a5a6a;font-size:0.85rem;">{"Generated content will appear in the report above." if not st.session_state.report.get("strategy") else "✓ Included in your report above."}</div>
-</div>
-""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-
-# DISCLAIMER
-
-# ─────────────────────────────────────────────
-
-st.markdown(”””
-
+st.markdown("""
 <div class="disclaimer">
     <strong>⚖️ Disclaimer & Terms of Use</strong><br>
-    GMB Dominator is an <strong>informational, self-serve advisory tool</strong>. All recommendations are generated by AI and are for educational purposes only. This tool does not access, manage, or modify your Google Business Profile. Results may vary. We are not affiliated with Google LLC. By using this tool, you agree that all implementation is your sole responsibility. This is not a substitute for professional marketing consultation.
+    GMB Dominator is an informational tool. All recommendations are AI-generated.
 </div>
 """, unsafe_allow_html=True)
