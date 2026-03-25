@@ -14,7 +14,7 @@ from datetime import datetime
 # ─────────────────────────────────────────────
 
 st.set_page_config(
-page_title=“GMB Dominator”,
+page_title="GMB Dominator",
 page_icon=“🗺️”,
 layout=“wide”,
 initial_sidebar_state=“expanded”,
